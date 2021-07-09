@@ -21,12 +21,13 @@ import (
 )
 
 type saCfgInfo struct {
-	globalDims  map[interface{}]interface{}
-	saExtension map[string]interface{}
-	accessToken string
-	realm       string
-	monitors    []interface{}
-	observers   []interface{}
+	globalDims    map[interface{}]interface{}
+	saExtension   map[string]interface{}
+	configSources map[interface{}]interface{}
+	accessToken   string
+	realm         string
+	monitors      []interface{}
+	observers     []interface{}
 }
 
 func saExpandedToCfgInfo(saExpanded map[interface{}]interface{}) (saCfgInfo, error) {
@@ -35,25 +36,14 @@ func saExpandedToCfgInfo(saExpanded map[interface{}]interface{}) (saCfgInfo, err
 		return saCfgInfo{}, err
 	}
 	return saCfgInfo{
-		accessToken: saExpanded["signalFxAccessToken"].(string),
-		realm:       realm,
-		monitors:    saExpanded["monitors"].([]interface{}),
-		globalDims:  globalDims(saExpanded),
-		saExtension: saExtension(saExpanded),
-		observers:   observers(saExpanded),
+		accessToken:   saExpanded["signalFxAccessToken"].(string),
+		realm:         realm,
+		monitors:      saExpanded["monitors"].([]interface{}),
+		globalDims:    globalDims(saExpanded),
+		saExtension:   saExtension(saExpanded),
+		observers:     observers(saExpanded),
+		configSources: configSources(saExpanded),
 	}, nil
-}
-
-func observers(saExpanded map[interface{}]interface{}) []interface{} {
-	v, ok := saExpanded["observers"]
-	if !ok {
-		return nil
-	}
-	obs, ok := v.([]interface{})
-	if !ok {
-		return nil
-	}
-	return obs
 }
 
 func apiURLToRealm(saExpanded map[interface{}]interface{}) (string, error) {
@@ -116,4 +106,28 @@ func saExtension(saExpanded map[interface{}]interface{}) map[string]interface{} 
 	return map[string]interface{}{
 		"smartagent": extensionAttrs,
 	}
+}
+
+func observers(saExpanded map[interface{}]interface{}) []interface{} {
+	v, ok := saExpanded["observers"]
+	if !ok {
+		return nil
+	}
+	obs, ok := v.([]interface{})
+	if !ok {
+		return nil
+	}
+	return obs
+}
+
+func configSources(saExpanded map[interface{}]interface{}) map[interface{}]interface{} {
+	v, ok := saExpanded["configSources"]
+	if !ok {
+		return nil
+	}
+	cs, ok := v.(map[interface{}]interface{})
+	if !ok {
+		return nil
+	}
+	return cs
 }

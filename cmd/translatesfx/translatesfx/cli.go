@@ -57,7 +57,7 @@ func translateConfig(fname, wd string) string {
 	if err != nil {
 		log.Fatalf("error loading config %q: %v", fname, err)
 	}
-	saExpanded, err := expandSA(orig, wd)
+	saExpanded, err := translateSADirectives(orig, wd)
 	if err != nil {
 		log.Fatalf("error expanding Smart Agent config: %v", err)
 	}

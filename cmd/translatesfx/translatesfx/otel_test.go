@@ -46,13 +46,13 @@ func TestSAToOtelConfig(t *testing.T) {
 	otelConfig := saInfoToOtelConfig(saCfgInfo{
 		realm:       "us1",
 		accessToken: "s3cr3t",
-		monitors:    []interface{}{testvSphereMonitorCfg()},
+		monitors:    []interface{}{exampleMonitorCfg()},
 	})
 	require.Equal(t, expected, otelConfig.Receivers["smartagent/vsphere"])
 }
 
 func TestMonitorToReceiver(t *testing.T) {
-	receiver, _ := saMonitorToOtelReceiver(testvSphereMonitorCfg())
+	receiver, _ := saMonitorToOtelReceiver(exampleMonitorCfg())
 	v, ok := receiver["smartagent/vsphere"]
 	require.True(t, ok)
 	assert.Equal(t, "vsphere", v["type"])
@@ -204,12 +204,22 @@ func TestInfoToOtelConfig_Observers(t *testing.T) {
 	assert.Equal(t, []string{"k8s_observer"}, oc.Service.Extensions)
 }
 
+func TestInfoToOtelConfig_ZK(t *testing.T) {
+	oc := yamlToOtelConfig(t, "testdata/sa-zk.yaml")
+	v, ok := oc.ConfigSources["zookeeper"]
+	require.True(t, ok)
+	zk, ok := v.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, []interface{}{"127.0.0.1:2181"}, zk["endpoints"])
+	assert.Equal(t, "10s", zk["timeout"])
+}
+
 func TestDiscoveryRuleToRCRule(t *testing.T) {
 	rcr := discoveryRuleToRCRule(`container_image =~ "redis" && port == 6379`)
 	assert.Equal(t, `type == "port" && pod.name matches "redis" && port == 6379`, rcr)
 }
 
-func testvSphereMonitorCfg() map[interface{}]interface{} {
+func exampleMonitorCfg() map[interface{}]interface{} {
 	return map[interface{}]interface{}{
 		"type":     "vsphere",
 		"host":     "localhost",
@@ -220,7 +230,7 @@ func testvSphereMonitorCfg() map[interface{}]interface{} {
 
 func yamlToOtelConfig(t *testing.T, filename string) *otelCfg {
 	cfg := fromYAML(t, filename)
-	expanded, err := expandSA(cfg, "")
+	expanded, err := translateSADirectives(cfg, "")
 	require.NoError(t, err)
 	info, err := saExpandedToCfgInfo(expanded)
 	require.NoError(t, err)

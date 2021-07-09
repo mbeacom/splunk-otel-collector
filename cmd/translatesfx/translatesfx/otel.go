@@ -15,6 +15,7 @@
 package translatesfx
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 )
@@ -34,14 +35,36 @@ func saInfoToOtelConfig(sa saCfgInfo) *otelCfg {
 	translateGlobalDims(sa, otel)
 	translateSAExtension(sa, otel)
 	translateObservers(sa, otel)
+	translateConfigSources(sa, otel)
 	return otel
+}
+
+func translateConfigSources(sa saCfgInfo, otel *otelCfg) {
+	otel.ConfigSources = map[string]interface{}{
+		"include": nil,
+	}
+	if sa.configSources == nil {
+		return
+	}
+	v, ok := sa.configSources["zookeeper"]
+	if !ok {
+		return
+	}
+	zk, ok := v.(map[interface{}]interface{})
+	if !ok {
+		return
+	}
+	m := map[string]interface{}{
+		"endpoints": zk["endpoints"],
+	}
+	if tos, ok := zk["timeoutSeconds"]; ok {
+		m["timeout"] = fmt.Sprintf("%ds", tos)
+	}
+	otel.ConfigSources["zookeeper"] = m
 }
 
 func newOtelCfg() *otelCfg {
 	return &otelCfg{
-		ConfigSources: map[string]interface{}{
-			"include": nil,
-		},
 		Receivers: map[string]map[string]interface{}{},
 		Processors: map[string]map[string]interface{}{
 			resourceDetection: {
