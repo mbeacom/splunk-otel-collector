@@ -39,30 +39,6 @@ func saInfoToOtelConfig(sa saCfgInfo) *otelCfg {
 	return otel
 }
 
-func translateConfigSources(sa saCfgInfo, otel *otelCfg) {
-	otel.ConfigSources = map[string]interface{}{
-		"include": nil,
-	}
-	if sa.configSources == nil {
-		return
-	}
-	v, ok := sa.configSources["zookeeper"]
-	if !ok {
-		return
-	}
-	zk, ok := v.(map[interface{}]interface{})
-	if !ok {
-		return
-	}
-	m := map[string]interface{}{
-		"endpoints": zk["endpoints"],
-	}
-	if tos, ok := zk["timeoutSeconds"]; ok {
-		m["timeout"] = fmt.Sprintf("%ds", tos)
-	}
-	otel.ConfigSources["zookeeper"] = m
-}
-
 func newOtelCfg() *otelCfg {
 	return &otelCfg{
 		Receivers: map[string]map[string]interface{}{},
@@ -90,6 +66,57 @@ func newOtelCfg() *otelCfg {
 				},
 			},
 		},
+	}
+}
+
+func translateConfigSources(sa saCfgInfo, otel *otelCfg) {
+	otel.ConfigSources = map[string]interface{}{
+		"include": nil,
+	}
+	if sa.configSources == nil {
+		return
+	}
+
+	translateZK(sa, otel)
+	translateEtcd(sa, otel)
+}
+
+func translateZK(sa saCfgInfo, otel *otelCfg) {
+	if v, ok := sa.configSources["zookeeper"]; ok {
+		zk, ok := v.(map[interface{}]interface{})
+		if !ok {
+			return
+		}
+		m := map[string]interface{}{
+			"endpoints": zk["endpoints"],
+		}
+		if tos, ok := zk["timeoutSeconds"]; ok {
+			m["timeout"] = fmt.Sprintf("%ds", tos)
+		}
+		otel.ConfigSources["zookeeper"] = m
+	}
+}
+
+func translateEtcd(sa saCfgInfo, otel *otelCfg) {
+	if v, ok := sa.configSources["etcd2"]; ok {
+		etcd, ok := v.(map[interface{}]interface{})
+		if !ok {
+			return
+		}
+		m := map[string]interface{}{
+			"endpoints": etcd["endpoints"],
+		}
+		auth := map[string]interface{}{}
+		if username, ok := etcd["username"]; ok {
+			auth["username"] = username
+		}
+		if password, ok := etcd["password"]; ok {
+			auth["password"] = password
+		}
+		if len(auth) > 0 {
+			m["auth"] = auth
+		}
+		otel.ConfigSources["etcd2"] = m
 	}
 }
 

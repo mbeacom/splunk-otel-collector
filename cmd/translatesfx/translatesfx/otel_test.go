@@ -214,6 +214,21 @@ func TestInfoToOtelConfig_ZK(t *testing.T) {
 	assert.Equal(t, "10s", zk["timeout"])
 }
 
+func TestInfoToOtelConfig_Etcd(t *testing.T) {
+	oc := yamlToOtelConfig(t, "testdata/sa-etcd.yaml")
+	v, ok := oc.ConfigSources["etcd2"]
+	require.True(t, ok)
+	etcd, ok := v.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, []interface{}{"http://127.0.0.1:2379"}, etcd["endpoints"])
+	auth, ok := etcd["auth"]
+	require.True(t, ok)
+	assert.Equal(t, map[string]interface{}{
+		"username": "foo",
+		"password": "bar",
+	}, auth)
+}
+
 func TestDiscoveryRuleToRCRule(t *testing.T) {
 	rcr := discoveryRuleToRCRule(`container_image =~ "redis" && port == 6379`)
 	assert.Equal(t, `type == "port" && pod.name matches "redis" && port == 6379`, rcr)
