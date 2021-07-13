@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"gopkg.in/yaml.v2"
@@ -143,15 +144,15 @@ type directive struct {
 	optional bool
 }
 
-func (d directive) render(forceExpand bool) (interface{}, error) {
-	expanded, err := d.expandFromSource(forceExpand)
+func (d directive) render(forceExpand bool, vaultPaths *[]string) (interface{}, error) {
+	expanded, err := d.expandFromSource(forceExpand, vaultPaths)
 	if err != nil {
 		return nil, err
 	}
 	return expanded, err
 }
 
-func (d directive) expandFromSource(forceExpand bool) (interface{}, error) {
+func (d directive) expandFromSource(forceExpand bool, vaultPaths *[]string) (interface{}, error) {
 	switch d.fromType {
 	case directiveSourceFile:
 		return d.handleFileType(forceExpand)
@@ -159,6 +160,8 @@ func (d directive) expandFromSource(forceExpand bool) (interface{}, error) {
 		return d.expandEnv()
 	case directiveSourceZK:
 		return d.expandZK()
+	case directiveSourceVault:
+		return d.expandVault(vaultPaths)
 	case directiveSourceUnknown:
 		return nil, fmt.Errorf("#from fromType type unknown: %v", d.fromType)
 	default:
@@ -222,6 +225,32 @@ func (d directive) expandFiles() (interface{}, error) {
 
 func (d directive) expandZK() (interface{}, error) {
 	return fmt.Sprintf("${zookeeper:%s}", d.fromPath), nil
+}
+
+func (d directive) expandVault(vaultPaths *[]string) (interface{}, error) {
+	path, keys := parseVaultPath(d.fromPath)
+	idx, found := indexOf(*vaultPaths, path)
+	if !found {
+		idx = len(*vaultPaths)
+		*vaultPaths = append(*vaultPaths, path)
+	}
+	return fmt.Sprintf("${vault/%d:%s}", idx, keys), nil
+}
+
+func indexOf(a []string, s string) (int, bool) {
+	for i, v := range a {
+		if v == s {
+			return i, true
+		}
+	}
+	return 0, false
+}
+
+var vaultRegexp = regexp.MustCompile(`(.*)\[(.*)]`)
+
+func parseVaultPath(p string) (path string, keys string) {
+	found := vaultRegexp.FindAllStringSubmatch(p, -1)
+	return found[0][1], found[0][2]
 }
 
 func resolvePath(path, wd string) string {

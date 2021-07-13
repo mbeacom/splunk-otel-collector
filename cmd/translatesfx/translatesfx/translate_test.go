@@ -51,7 +51,7 @@ func TestSAExpandedToCfgInfo_ZK(t *testing.T) {
 
 func yamlToCfgInfo(t *testing.T, filename string) saCfgInfo {
 	v := fromYAML(t, filename)
-	expanded, err := translateSADirectives(v, "")
+	expanded, _, err := translateSADirectives(v, "")
 	require.NoError(t, err)
 	cfg, err := saExpandedToCfgInfo(expanded)
 	require.NoError(t, err)

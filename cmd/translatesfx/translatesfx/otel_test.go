@@ -47,7 +47,7 @@ func TestSAToOtelConfig(t *testing.T) {
 		realm:       "us1",
 		accessToken: "s3cr3t",
 		monitors:    []interface{}{exampleMonitorCfg()},
-	})
+	}, nil)
 	require.Equal(t, expected, otelConfig.Receivers["smartagent/vsphere"])
 }
 
@@ -229,6 +229,15 @@ func TestInfoToOtelConfig_Etcd(t *testing.T) {
 	}, auth)
 }
 
+func TestInfoToOtelConfig_Vault(t *testing.T) {
+	oc := yamlToOtelConfig(t, "testdata/sa-vault.yaml")
+	v, ok := oc.ConfigSources["vault/0"]
+	require.True(t, ok)
+	vault, ok := v.(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "http://127.0.0.1:8200", vault["endpoint"])
+}
+
 func TestDiscoveryRuleToRCRule(t *testing.T) {
 	rcr := discoveryRuleToRCRule(`container_image =~ "redis" && port == 6379`)
 	assert.Equal(t, `type == "port" && pod.name matches "redis" && port == 6379`, rcr)
@@ -245,9 +254,9 @@ func exampleMonitorCfg() map[interface{}]interface{} {
 
 func yamlToOtelConfig(t *testing.T, filename string) *otelCfg {
 	cfg := fromYAML(t, filename)
-	expanded, err := translateSADirectives(cfg, "")
+	expanded, vaultPaths, err := translateSADirectives(cfg, "")
 	require.NoError(t, err)
 	info, err := saExpandedToCfgInfo(expanded)
 	require.NoError(t, err)
-	return saInfoToOtelConfig(info)
+	return saInfoToOtelConfig(info, vaultPaths)
 }
