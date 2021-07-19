@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"gopkg.in/yaml.v2"
@@ -160,6 +159,8 @@ func (d directive) expandFromSource(forceExpand bool, vaultPaths *[]string) (int
 		return d.expandEnv()
 	case directiveSourceZK:
 		return d.expandZK()
+	case directiveSourceEtcd2:
+		return d.expandEtcd2()
 	case directiveSourceVault:
 		return d.expandVault(vaultPaths)
 	case directiveSourceUnknown:
@@ -225,6 +226,10 @@ func (d directive) expandFiles() (interface{}, error) {
 
 func (d directive) expandZK() (interface{}, error) {
 	return fmt.Sprintf("${zookeeper:%s}", d.fromPath), nil
+}
+
+func (d directive) expandEtcd2() (interface{}, error) {
+	return fmt.Sprintf("${etcd2:%s}", d.fromPath), nil
 }
 
 func (d directive) expandVault(vaultPaths *[]string) (interface{}, error) {
