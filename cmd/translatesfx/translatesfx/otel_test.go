@@ -227,6 +227,8 @@ func TestInfoToOtelConfig_Etcd(t *testing.T) {
 		"username": "foo",
 		"password": "bar",
 	}, auth)
+	r := oc.Receivers["smartagent/collectd/redis"]
+	assert.Equal(t, "${etcd2:/redishost}", r["host"])
 }
 
 func TestDiscoveryRuleToRCRule(t *testing.T) {
