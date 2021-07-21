@@ -28,29 +28,29 @@ Default configuration steps in the container definition for the Collector:
 ## Custom Configuration
 For the Collector pick up your custom configuration, you need to assign the path to your custom
 configuration file to environment variable `SPLUNK_CONFIG` in the container definition for
-the Collector. In Fargate, this means uploading your custom configuration file to a volume
-attached to the task.
+the Collector. In Fargate, this means having your custom configuration file in a volume
+attached to the task and assigning the path to `SPLUNK_CONFIG`.
 
-### ecsobserver
+### ecs_observer
 Add extension
 [Amazon Elastic Container Service Observer](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/extension/observer/ecsobserver#amazon-elastic-container-service-observer)
 (ecsobserver or ecs_observer) to your custom configuration to discover application metrics
 targets. The `ecs_observer` can discover targets in running tasks, filtered by service names,
-task definitions and container labels. It is currently limited to discovering Prometheus
-targets and requires the read-only permissions below. Add the permissions to the task role
-by adding them to a customer-managed policy that is attached to the task role.
+task definitions and container labels. The `ecs_observer` is currently limited to discovering
+Prometheus targets and requires the read-only permissions below. Add the permissions to the task role
+by adding them to a customer-managed policy attached to the task role.
 ```text
 ecs:List*
 ecs:Describe*
 ```
 
-The `ecs_observer` in the example below is configured to find Prometheus targets in
-cluster `lorem-ipsum-cluster`, region `us-west-2`, where the task arn pattern is 
+In the example below, the `ecs_observer` is configured to find Prometheus targets in
+cluster `lorem-ipsum-cluster` of region `us-west-2` where the task arn pattern is 
 `^arn:aws:ecs:us-west-2:906383545488:task-definition/lorem-ipsum-task:[0-9]+$`,
-and write the results in file `/etc/ecs_sd_targets.yaml`. Receiver `prometheus` is
+and write the results in file `/etc/ecs_sd_targets.yaml`. The `prometheus` receiver is
 configured to read targets from the results file. Note that the values for `access_token`
-and `realm` are read from environment variables `SPLUNK_ACCESS_TOKEN` and `SPLUNK_REALM`,
-which must be specified in the container definition.
+and `realm` are read from environment variables `SPLUNK_ACCESS_TOKEN` and `SPLUNK_REALM`
+respectively, which must be specified in the container definition.
 
 ```yaml
 extensions:
@@ -92,7 +92,7 @@ service:
 ```
 In a sidecar deployment the discovered targets must be within the task in which the Collector
 container is running. Note that the task arn pattern in the example above 
-restricts the `ecs_observer` to discover targets in running **revision**(s) of task `lorem-ipsum-task`.
+restricts the `ecs_observer` to discover targets in running revisions of task `lorem-ipsum-task`.
 This means that the `ecs_observer` will discover targets outside the task in which the Collector is
 running when multiple revisions of task `lorem-ipsum-task` are running. One way
 to solve this is to use the complete task arn as shown below. This however adds the headache of
@@ -116,6 +116,6 @@ specify the configuration YAML directly at the commandline using environment var
   read access to the Parameter Store.
 
 ### Standalone Container
-The `ecs_observer` is capable of scanning for targets in an entire cluster in a given region.
-This allows for the Collector to run and collect telemetry data in a task separate from the
-monitored application.
+The `ecs_observer` is capable of scanning for targets in the entire cluster in a given region.
+This allows for the Collector to run in a task separate from the monitored application and
+collect telemetry data.
