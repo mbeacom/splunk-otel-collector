@@ -3,9 +3,9 @@ Familiarity with AWS Fargate (Fargate) is assumed. Consult the
 [User Guide for AWS Fargate](https://docs.aws.amazon.com/AmazonECS/latest/userguide/what-is-fargate.html) for further reading.
 
 Unless stated otherwise, it is assumed that the [Splunk OpenTelemetry Collector](https://github.com/signalfx/splunk-otel-collector)
-(Collector) is deployed to an ECS Task as **sidecar** container alongside monitored applications.
+(Collector) is deployed to an ECS Task in a **sidecar** container alongside monitored applications.
 
-Applies to Collector release >= v0.30.0. See the Docker image repository
+Applies to Collector release v0.30.0 and above. See the Docker image repository
 [here](https://quay.io/repository/signalfx/splunk-otel-collector?tab=tags).
 
 
@@ -15,45 +15,42 @@ in the Collector image. See
 [here](https://github.com/signalfx/splunk-otel-collector/blob/main/cmd/otelcol/config/collector/fargate_config.yaml)
 for its contents and 
 [here](https://github.com/signalfx/splunk-otel-collector/blob/main/cmd/otelcol/Dockerfile)
-for the Dockerfile.
+for the Collector image Dockerfile. Note that the default metrics receivers are `hostmetrics`
+and `smartagent/ecs-metadata`.
 
-You configure the Collector to use the default configuration file by assigning its path
-to environment variable `SPLUNK_CONFIG` in the container definition.
-You also need to map the endpoint ports in the default configuration file
-(i.e. `13133`, `6060`, `55679`, `14250`, `6832`, `6831`, `14268`, `8888`, `7276`,
-`9943`, `9411`, `9080`). 
-
-The default metrics receivers are `hostmetrics` and `smartagent/ecs-metadata`.
-Assign a list of metrics you want to exclude environment variable `METRICS_TO_EXCLUDE`.
-Assign a list of images whose metrics you want excluded to environment variable
-`IMAGES_TO_EXCLUDE`.
+Default configuration steps in the container definition for the Collector:
+- Map the endpoint ports in the default configuration file (i.e. `13133`, `6060`,
+  `55679`, `14250`, `6832`, `6831`, `14268`, `8888`, `7276`, `9943`, `9411`, `9080`).
+- Assign the default configuration file path to environment variable `SPLUNK_CONFIG`.
+- Assign a list of metrics you want excluded to environment variable `METRICS_TO_EXCLUDE`.
+- Assign a list of images whose metrics you want excluded to environment variable `IMAGES_TO_EXCLUDE`.
 
 ## Custom Configuration
-In container definition for the Collector, assign the path to your custom configuration
-file to environment variable `SPLUNK_CONFIG` and the Collector will pick up the custom
-configuration. In Fargate, this means uploading the custom configuration file to a volume
+For the Collector pick up your custom configuration, you need to assign the path to your custom
+configuration file to environment variable `SPLUNK_CONFIG` in the container definition for
+the Collector. In Fargate, this means uploading your custom configuration file to a volume
 attached to the task.
 
 ### ecsobserver
-Configure the Collector to use extension
+Add extension
 [Amazon Elastic Container Service Observer](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/extension/observer/ecsobserver#amazon-elastic-container-service-observer)
-(ecsobserver or ecs_observer) to discover application metrics targets. The `ecs_observer`
-can discover targets in running tasks, filtered by service names, task definitions and
-container labels. It is currently limited to discovering Prometheus targets and requires
-the read-only permissions below. Add the permissions to the task role by adding them to
-a customer-managed policy that is attached to the task role.
+(ecsobserver or ecs_observer) to your custom configuration to discover application metrics
+targets. The `ecs_observer` can discover targets in running tasks, filtered by service names,
+task definitions and container labels. It is currently limited to discovering Prometheus
+targets and requires the read-only permissions below. Add the permissions to the task role
+by adding them to a customer-managed policy that is attached to the task role.
 ```text
 ecs:List*
 ecs:Describe*
 ```
 
-In the example below, the `ecs_observer` is configured to find Prometheus targets in
+The `ecs_observer` in the example below is configured to find Prometheus targets in
 cluster `lorem-ipsum-cluster`, region `us-west-2`, where the task arn pattern is 
 `^arn:aws:ecs:us-west-2:906383545488:task-definition/lorem-ipsum-task:[0-9]+$`,
 and write the results in file `/etc/ecs_sd_targets.yaml`. Receiver `prometheus` is
-configured to read targets from the results file. Note that the `access_token` and `realm`
-are read from environment variables `SPLUNK_ACCESS_TOKEN` and `SPLUNK_REALM` so these
-environment variables must also be specified in the container definition.
+configured to read targets from the results file. Note that the values for `access_token`
+and `realm` are read from environment variables `SPLUNK_ACCESS_TOKEN` and `SPLUNK_REALM`,
+which must be specified in the container definition.
 
 ```yaml
 extensions:
@@ -94,7 +91,7 @@ service:
       exporters: [signalfx]
 ```
 In a sidecar deployment the discovered targets must be within the task in which the Collector
-container is running. Note that the task arn pattern in the configuration example above 
+container is running. Note that the task arn pattern in the example above 
 restricts the `ecs_observer` to discover targets in running **revision**(s) of task `lorem-ipsum-task`.
 This means that the `ecs_observer` will discover targets outside the task in which the Collector is
 running when multiple revisions of task `lorem-ipsum-task` are running. One way
@@ -108,17 +105,17 @@ updating the configuration to keep pace with task revisions.
 ```
 
 ### Direct Configuration
-Since access to the filesystem is not readily available in Fargate, it is convenient to
-use environment variable `SPLUNK_CONFIG_YAML` which allows you can specify 
-the configuration YAML directly at the commandline. You can simply create a parameter
-in the AWS Systems Manager (Amazon SSM) Parameter Store and add your custom configuration
-YAML as its value. Then in the container definition for the Collector, specify
-environment variable `SPLUNK_CONFIG_YAML` and have it get its value from the parameter.
-You need to add access permissions to Amazon SSM to the task role, and you can do it by
-attaching policy `AmazonSSMReadOnlyAccess` to task role.
-
+Since access to the filesystem is not readily available in Fargate, it may be convenient to
+specify the configuration YAML directly at the commandline using environment variable
+`SPLUNK_CONFIG_YAML`. The steps are:
+- Create a parameter in the AWS Systems Manager Parameter Store for your custom configuration
+  YAML.
+- Use the `ValueFrom` feature to assign the parameter to environment variable
+  `SPLUNK_CONFIG_YAML` in the container definition for the Collector.
+- Add policy `AmazonSSMReadOnlyAccess` to the task role in order for the task to have
+  read access to the Parameter Store.
 
 ### Standalone Container
-The `ecs_observer` allows for the Collector to run in a standalone container in a separate
-task. You simply add the container definition for the Collector to a task that is separate
-from the task containing the monitored application.
+The `ecs_observer` is capable of scanning for targets in an entire cluster in a given region.
+This allows for the Collector to run and collect telemetry data in a task separate from the
+monitored application.
